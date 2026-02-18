@@ -1,0 +1,10 @@
+[project]
+name = "skill-sticker-helper"
+version = "0.1.0"
+description = "Agent Skill for generating stickers using Gemini API image generation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "google-genai>=1.63.0",
+    "pillow>=12.1.1",
+]

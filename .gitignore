@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+
+# Output / test artifacts
+output/
+test.png
+test_chroma_spec.json
+references/
+
+# IDE / editor
+.claude/
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Images (user uploads / generated samples)
+*.PNG
+*.JPG
+*.jpg
+*.png
+*.apng
+!scripts/**/*.png
