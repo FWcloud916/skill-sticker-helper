@@ -49,7 +49,6 @@ output/
 regen_tmp/
 test.png
 test_chroma_spec.json
-references/
 *.PNG
 *.JPG
 *.jpg

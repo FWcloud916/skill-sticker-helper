@@ -145,7 +145,7 @@ Use the `skill-simple-image-tool` skill to perform the following operations:
 
 ### Reference
 
-- LINE sticker specifications are documented in `references/line_sticker_spec.md`
+- LINE sticker specs: 370×320px, <1MB (static); 320×270px, 5–20 frames, ≤4s, <1MB,10-20 fps (animated)
 
 ---
 
@@ -399,5 +399,5 @@ See `features.json` for a full example using Chinese field names.
 
 ## Reference
 
-- LINE sticker specifications are documented in `references/line_sticker_spec.md`
+- LINE sticker specs: 370×320px, <1MB (static); 320×270px, 5–20 frames, ≤4s, <1MB, 10-20 fps (animated)
 - The `GEMINI_API_KEY` environment variable must be set before running scripts
