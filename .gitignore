@@ -11,12 +11,6 @@ build/
 # Environment
 .env
 
-# Output / test artifacts
-output/
-test.png
-test_chroma_spec.json
-references/
-
 # IDE / editor
 .claude/
 .idea/
@@ -25,7 +19,37 @@ references/
 # macOS
 .DS_Store
 
-# Images (user uploads / generated samples)
+# ── Project file layout ─────────────────────────────────────────────────────
+#
+#   chars/          character features JSONs         ← TRACKED
+#   refs/           reference photos for analysis    ← ignored (binary)
+#   anims/<name>/
+#     spec.json     animation spec                  ← TRACKED
+#     anchors.json  per-frame anchor coords         ← TRACKED
+#     frames/       raw generated frames            ← ignored (binary)
+#     aligned/      aligned full-res frames         ← ignored (binary)
+#     sm/           resized frames for LINE         ← ignored (binary)
+#     <name>.apng   final sticker output            ← ignored (binary)
+#
+# ────────────────────────────────────────────────────────────────────────────
+
+# Reference images
+refs/
+
+# Intermediate frame directories (all binary .png content)
+anims/*/frames/
+anims/*/aligned/
+anims/*/sm/
+
+# Final outputs (regenerable from spec + features + anchors)
+anims/*/*.apng
+
+# Legacy root-level artifacts (pre-convention)
+output/
+regen_tmp/
+test.png
+test_chroma_spec.json
+references/
 *.PNG
 *.JPG
 *.jpg

@@ -1,0 +1,25 @@
+{
+  "character_features": "chars/maltese_dog.json",
+  "background": "transparent",
+  "chroma_key": "#00FF00",
+  "model": "flash",
+  "frame_prompts": [
+    "Frame 1: Maltese dog sitting upright, both front paws resting on the ground, calm happy expression, mouth closed with a slight smile — this is the rest pose",
+    "Frame 2: Maltese dog sitting, right front paw just starting to lift off the ground slightly, gentle smile",
+    "Frame 3: Maltese dog sitting, right front paw lifted to knee height, slight smile beginning",
+    "Frame 4: Maltese dog sitting, right front paw raised to chest/belly height, smile widening",
+    "Frame 5: Maltese dog sitting, right front paw raised to shoulder height, open happy smile",
+    "Frame 6: Maltese dog sitting, right front paw raised above shoulder, big smile with mouth open",
+    "Frame 7: Maltese dog sitting, right front paw near the top of the wave arc, huge joyful smile with tongue out, eyes bright. IMPORTANT: exactly 4 limbs total — no extra paws or feet",
+    "Frame 8: Maltese dog sitting, right front paw at peak overhead, waving enthusiastically, huge joyful smile with tongue out, eyes crinkled with joy. IMPORTANT: exactly 4 limbs — no extra paws",
+    "Frame 9: Maltese dog sitting, right front paw just past peak, starting to descend, still waving, big smile with tongue out",
+    "Frame 10: Maltese dog sitting, right front paw back near top of arc descending, big happy smile with tongue out",
+    "Frame 11: Maltese dog sitting, right front paw descending to above-shoulder height, smile with tongue out",
+    "Frame 12: Maltese dog sitting, right front paw back at shoulder height descending, open happy smile",
+    "Frame 13: Maltese dog sitting, right front paw lowering to chest height, happy relaxed smile, mouth slightly open",
+    "Frame 14: Maltese dog sitting, right front paw at knee height descending, gentle smile",
+    "Frame 15: Maltese dog sitting, right front paw almost back to ground, slight smile",
+    "Frame 16: Maltese dog sitting upright, both front paws resting on ground, calm happy expression, mouth closed with slight smile — back to rest pose matching frame 1"
+  ],
+  "first_frame_reference": null
+}

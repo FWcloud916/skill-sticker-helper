@@ -89,31 +89,64 @@ echo '{
 | `--remove-bg` | Remove chroma key background after generation |
 | `--line-resize` | Resize to fit within LINE sticker limits (370×320) |
 
+### Detect anchor points in a frame (Gemini vision)
+
+```bash
+uv run python scripts/analyze_frame.py frame_000.png
+```
+
+Outputs a JSON with `feet_y_frac`, `head_y_frac`, `center_x_frac`, `center_y_frac`, `bbox_px`. Useful for inspecting individual frames; for batch alignment prefer `--anchor-file` (Claude-analyzed) or `--pixel-align`.
+
 ### Cut a sprite sheet into frames
 
 ```bash
+# Auto-detect grid
+uv run python scripts/make_apng.py cut sprite.png --auto-grid -o ./frames/
+
+# Explicit grid
 uv run python scripts/make_apng.py cut sprite.png --cols 3 --rows 3 --count 9 -o ./frames/
 ```
 
 ### Align frames (center characters, remove background jitter)
 
 ```bash
+# Default: bbox centering, auto-detect background
 uv run python scripts/make_apng.py align ./frames/ -o ./aligned/
 uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --width 320 --height 270
-uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --chroma-key "#00FF00"
+uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --chroma-key "#00FF00" --edge-feather 2.0
+
+# Anchor file (most stable — pre-computed coordinates, no API calls)
+uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --anchor-file anchors.json
+
+# Pixel-based alignment (alpha-weighted centroid, no API)
+uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --pixel-align
+
+# Gemini vision alignment (use with --anchor bottom only; unreliable for center)
+uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --vision-align --anchor bottom
+
+# Bottom anchor for walk/jump animations
+uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --anchor bottom
 ```
+
+**Alignment mode priority** (when multiple flags are given): `--anchor-file` > `--pixel-align` > `--vision-align` > bbox (default)
 
 ### Combine frames into APNG
 
 ```bash
-uv run python scripts/make_apng.py combine ./aligned/ -o sticker.apng --fps 10 --loop 0
+# Default (16fps)
+uv run python scripts/make_apng.py combine ./aligned/ -o sticker.apng
+
+# Explicit FPS or duration
+uv run python scripts/make_apng.py combine ./aligned/ -o sticker.apng --fps 12
+uv run python scripts/make_apng.py combine ./aligned/ -o sticker.apng --duration 2000
+
+# Easing + file size optimization
+uv run python scripts/make_apng.py combine ./aligned/ -o sticker.apng --timing ease-in-out --quantize --auto-resize
 ```
 
-Or specify total duration instead of FPS:
+Available `--timing` presets: `uniform` (default), `ease-in`, `ease-out`, `ease-in-out`, `bounce`. Or pass explicit ms per frame: `--timing "100,80,60,80,100"`.
 
-```bash
-uv run python scripts/make_apng.py combine ./aligned/ -o sticker.apng --duration 2000 --loop 0
-```
+After saving, the tool automatically prints a `[LOOP OK]` or `[LOOP WARN]` score for the first↔last frame transition.
 
 ## Generation Spec JSON
 
@@ -167,6 +200,13 @@ Keys and nesting are flexible — the model will include relevant fields and omi
 | Animated | ≤ 320×270 px | 5–20 | ≤ 4 s | < 1 MB |
 
 Both are validated automatically after generation.
+
+## Tutorial
+
+Two tutorials, both using the Maltese dog waving sticker as a worked example:
+
+- **[docs/TUTORIAL_SKILL.md](docs/TUTORIAL_SKILL.md)** — for users interacting with the AI assistant: what to say, what to expect, and how to iterate. No CLI knowledge needed.
+- **[docs/TUTORIAL.md](docs/TUTORIAL.md)** — for developers running the pipeline manually: all CLI commands, file formats, and technical details explained step by step.
 
 ## Agent Skill Setup
 

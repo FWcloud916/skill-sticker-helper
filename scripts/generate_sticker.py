@@ -9,9 +9,14 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Allow importing image_utils from the same scripts/ directory
+sys.path.insert(0, os.path.dirname(__file__))
+
+from image_utils import remove_chroma_key
+
 from google import genai
 from google.genai import types
-from PIL import Image, ImageChops
+from PIL import Image
 
 # Model ID mapping
 MODELS = {
@@ -165,38 +170,6 @@ def build_contents(spec: dict, prompt: str) -> list:
     return parts
 
 
-def remove_chroma_key(
-    img: Image.Image,
-    chroma_color: str = "#00FF00",
-    tolerance: int = 40,
-) -> Image.Image:
-    """Remove chroma key background from an image using color distance.
-
-    Converts pixels whose max channel distance from chroma_color is within
-    tolerance to transparent. Returns an RGBA image.
-
-    Args:
-        img: Source PIL Image (any mode).
-        chroma_color: Hex color string of the chroma key background.
-        tolerance: Max per-channel color distance to treat as background (0-255).
-    """
-    chroma_color = chroma_color.lstrip("#")
-    cr = int(chroma_color[0:2], 16)
-    cg = int(chroma_color[2:4], 16)
-    cb = int(chroma_color[4:6], 16)
-
-    rgba = img.convert("RGBA")
-    r_ch, g_ch, b_ch, _ = rgba.split()
-
-    diff_r = r_ch.point(lambda p: abs(p - cr))
-    diff_g = g_ch.point(lambda p: abs(p - cg))
-    diff_b = b_ch.point(lambda p: abs(p - cb))
-
-    max_diff = ImageChops.lighter(ImageChops.lighter(diff_r, diff_g), diff_b)
-    new_alpha = max_diff.point(lambda p: 0 if p <= tolerance else 255)
-    rgba.putalpha(new_alpha)
-    return rgba
-
 
 def resize_to_line_sticker(img: Image.Image) -> Image.Image:
     """Resize image to fit within LINE sticker dimensions (370x320), maintaining aspect ratio.
@@ -245,6 +218,7 @@ def generate_sticker(
     output_dir: str,
     remove_bg: bool = False,
     line_resize: bool = False,
+    feather_radius: float = 0.0,
 ) -> list[str]:
     """Generate sticker image(s) from a spec and save to output_dir."""
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -321,8 +295,11 @@ def generate_sticker(
                     # Apply chroma key removal if requested
                     if remove_bg and spec.get("background") == "transparent":
                         chroma_color = spec.get("chroma_key", "#00FF00")
-                        img = remove_chroma_key(img, chroma_color=chroma_color)
-                        print(f"  Applied chroma key removal (color={chroma_color})", file=sys.stderr)
+                        img = remove_chroma_key(img, chroma_color=chroma_color, feather_radius=feather_radius)
+                        print(
+                            f"  Applied chroma key removal (color={chroma_color}, feather={feather_radius})",
+                            file=sys.stderr,
+                        )
 
                     # Resize to LINE sticker dimensions if requested
                     if line_resize:
@@ -376,6 +353,16 @@ def main():
         default=False,
         help="Resize output to fit within LINE sticker dimensions (370x320), maintaining aspect ratio.",
     )
+    parser.add_argument(
+        "--edge-feather",
+        type=float,
+        default=0.0,
+        dest="edge_feather",
+        help=(
+            "Gaussian blur radius for soft alpha edges after chroma key removal "
+            "(default: 0 = hard edges). Requires --remove-bg."
+        ),
+    )
     args = parser.parse_args()
 
     # Read spec from file or stdin
@@ -386,7 +373,12 @@ def main():
         spec = json.load(sys.stdin)
 
     try:
-        saved = generate_sticker(spec, args.output, remove_bg=args.remove_bg, line_resize=args.line_resize)
+        saved = generate_sticker(
+            spec, args.output,
+            remove_bg=args.remove_bg,
+            line_resize=args.line_resize,
+            feather_radius=args.edge_feather,
+        )
     except EnvironmentError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

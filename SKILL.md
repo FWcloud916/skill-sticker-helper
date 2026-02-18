@@ -177,7 +177,7 @@ Discuss with the user and choose appropriate FPS and frame count.
 
 ### 4. Generate Animation Frames
 
-Use Gemini (via Workflow A's generation spec) to generate frames. Two approaches:
+Use Gemini to generate frames. Two approaches:
 
 **Option A: Sprite sheet** — Generate a single image containing all frames in a grid (e.g., 3x3 grid for 9 frames). Include grid layout instructions in the prompt.
 
@@ -185,38 +185,171 @@ Use Gemini (via Workflow A's generation spec) to generate frames. Two approaches
 > - Explicitly tell Gemini: "No grid lines, no borders, no dividers, no gaps between frames. Each frame should occupy its grid cell seamlessly with no visible separation."
 > - Otherwise Gemini tends to draw visible split lines between cells, which ruins frame cutting.
 
-**Option B: Separate images** — Generate each frame individually with sequential expression/pose changes.
+**Option B: Sequential frames with reference chaining (recommended)** — Generate each frame individually and feed the previous frame back as a visual reference. This keeps the character's appearance consistent across frames.
+
+Save the animation spec as `anims/<name>/spec.json`. The `character_features` path should point to `chars/<character>.json`:
+
+```json
+{
+  "character_features": "chars/my_character.json",
+  "background": "transparent",
+  "chroma_key": "#00FF00",
+  "model": "flash",
+  "frame_prompts": [
+    "Frame 1: character stands facing forward, arms at sides, neutral expression",
+    "Frame 2: character begins raising right arm, slight smile",
+    "Frame 3: character's right arm at shoulder height, smile widening",
+    "Frame 4: character waves right hand overhead, big smile",
+    "Frame 5: character waves right hand, elbow bent, eyes crinkled",
+    "Frame 6: character's arm at shoulder height again, smile",
+    "Frame 7: character's arm lowering, relaxed expression",
+    "Frame 8: character back to neutral pose, arms at sides"
+  ],
+  "first_frame_reference": null
+}
+```
+
+> **Note**: Use `"model": "flash"` for multi-frame generations to avoid hitting API rate limits.
+
+> **Frame description guidelines:**
+> - Describe the **pose** (body position, limb angles) and **expression** separately for each frame
+> - Keep descriptions consistent: reuse the same body/clothing terms across all frames
+> - For looping animations, make the last frame's pose close to the first frame's pose (smooth loop)
+> - Aim for even motion steps — avoid large jumps between consecutive frames
+>
+> **Example 8-frame "waving hello" breakdown:**
+>
+> | Frame | Pose | Expression |
+> |-------|------|------------|
+> | 1 | Arms at sides, standing | Neutral |
+> | 2 | Right arm rising to shoulder | Slight smile |
+> | 3 | Right arm at shoulder height | Smile |
+> | 4 | Right hand waving overhead | Big smile |
+> | 5 | Right hand waving, elbow bent | Eyes crinkled |
+> | 6 | Right arm back at shoulder height | Smile |
+> | 7 | Right arm lowering | Relaxed |
+> | 8 | Arms at sides (= frame 1) | Neutral |
+
+Run the generation:
+
+```bash
+uv run python scripts/generate_animation.py -s anims/<name>/spec.json -o anims/<name>/frames/ --edge-feather 2.0
+```
+
+Output: `{"frames": ["anims/<name>/frames/frame_000.png", ...]}`
 
 ### 5. Cut Sprite Sheet (if needed)
 
-If a sprite sheet was generated, split it into individual frames:
+If a sprite sheet was generated (Option A), split it into individual frames.
+
+**Auto-detect grid** (recommended when grid dimensions are unknown):
 
 ```bash
-uv run python scripts/make_apng.py cut <sprite.png> --cols 3 --rows 3 --count 9 -o ./frames/
+uv run python scripts/make_apng.py cut sprite.png --auto-grid -o anims/<name>/frames/
+```
+
+**Explicit grid** (when you know the layout):
+
+```bash
+uv run python scripts/make_apng.py cut sprite.png --cols 3 --rows 3 --count 9 -o anims/<name>/frames/
 ```
 
 ### 6. Align Frames
 
-The character's position and size may vary across frames (common with AI-generated sprite sheets). Align them before combining to avoid a jittery animation:
+The character's position and size may vary across frames. Align them before combining to avoid a jittery animation.
 
-```bash
-uv run python scripts/make_apng.py align ./frames/ -o ./aligned/
+**Choose an alignment mode** (best to worst stability):
+
+**Option 1 — Anchor file (recommended for sit/stand animations)**
+
+Analyze the frames visually yourself (using your built-in vision) and write `anims/<name>/anchors.json` with per-frame pixel coordinates. This is the most stable because it uses fixed, hand-verified coordinates with no API variability.
+
+```json
+{
+  "frame_000.png": {"center_x": 512, "center_y": 519, "feet_y": 930, "head_y": 100},
+  "frame_001.png": {"center_x": 511, "center_y": 518, "feet_y": 926, "head_y": 100}
+}
 ```
 
-This step:
-- Finds the character bounding box in each frame (auto-detects transparent vs solid background)
-- Centers all characters on a uniform canvas
-- Removes solid backgrounds, outputting transparent PNGs
+```bash
+uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/ \
+  --anchor-file anims/<name>/anchors.json --edge-feather 2.0
+```
 
-You can specify a fixed canvas size with `--width` and `--height`.
+All coordinates are in the **original (pre-crop) frame's pixel space**. Missing frames fall back to bbox centering.
+
+**Option 2 — Pixel-based alignment (no API, deterministic)**
+
+Uses alpha-weighted centroid and row-density scan — no API calls needed.
+
+```bash
+uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/ --pixel-align --edge-feather 2.0
+```
+
+**Option 3 — Gemini vision alignment**
+
+Calls `gemini-2.5-flash`. **Not recommended for `--anchor center`** due to inconsistent results. Only use with `--anchor bottom` for walk/jump animations.
+
+```bash
+uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/ --vision-align --anchor bottom
+```
+
+**Option 4 — Default bbox centering**
+
+```bash
+uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/
+```
+
+**For walk/jump animations** — anchor feet at a fixed height:
+
+```bash
+uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/ --anchor bottom
+```
+
+You can also specify a fixed canvas size with `--width` and `--height`.
+
+### 6b. Resize to LINE Dimensions
+
+After aligning, scale the full-res frames down to fit LINE's 320×270 limit:
+
+```bash
+uv run python -c "
+from PIL import Image; from pathlib import Path
+src, dst = Path('anims/<name>/aligned'), Path('anims/<name>/sm')
+dst.mkdir(exist_ok=True)
+for f in sorted(src.glob('*.png')):
+    img = Image.open(f); img.thumbnail((320, 270), Image.LANCZOS)
+    img.save(str(dst / f.name), 'PNG')
+"
+```
 
 ### 7. Combine Frames into APNG
 
-Assemble the aligned frames into an animated PNG:
+Assemble the resized frames into the final animated PNG:
 
 ```bash
-uv run python scripts/make_apng.py combine ./aligned/ -o sticker.apng --fps 10 --loop 0
+uv run python scripts/make_apng.py combine anims/<name>/sm/ -o anims/<name>/<name>.apng --fps 16
 ```
+
+**Variable timing** — smooth motion with easing curves:
+
+```bash
+uv run python scripts/make_apng.py combine anims/<name>/sm/ -o anims/<name>/<name>.apng --timing ease-in-out
+```
+
+Available timing presets: `uniform` (default), `ease-in`, `ease-out`, `ease-in-out`, `bounce`.
+Or pass explicit per-frame durations: `--timing "100,80,60,80,100"`.
+
+**File size optimization** — if the APNG exceeds LINE's 1MB limit:
+
+```bash
+uv run python scripts/make_apng.py combine anims/<name>/sm/ -o anims/<name>/<name>.apng --quantize --auto-resize
+```
+
+- `--quantize`: reduces colors to 256 (often enough to meet the size limit)
+- `--auto-resize`: if still over 1MB, automatically scales frames to 80% (up to 3 attempts)
+
+> **Loop smoothness**: After saving, the tool automatically prints a `[LOOP OK]` or `[LOOP WARN]` score comparing the first and last frames. A `LOOP WARN` (score ≥ 20) means the loop transition may look jarring — consider adjusting the last frame to match the first frame's pose more closely.
 
 ### 8. Iterate
 
