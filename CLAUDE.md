@@ -44,7 +44,6 @@ anims/
 | `scripts/make_apng.py` | Cut sprite sheets, align frames, combine into APNG |
 | `scripts/image_utils.py` | Shared chroma key removal, soft alpha, and pixel anchor utilities |
 | `scripts/analyze_sample.py` | Analyze a reference image to extract character features |
-| `scripts/analyze_frame.py` | Gemini vision anchor detection for a single frame (used by `--vision-align`) |
 
 ## Environment
 - `GEMINI_API_KEY` must be set before running any generation scripts.
@@ -83,9 +82,6 @@ uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/al
 
 # Pixel-based alignment (alpha-weighted centroid, no API)
 uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/ --pixel-align
-
-# Gemini vision alignment (not recommended for --anchor center; use for --anchor bottom only)
-uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/ --vision-align --anchor bottom
 ```
 
 ### Anchor file format (for --anchor-file)

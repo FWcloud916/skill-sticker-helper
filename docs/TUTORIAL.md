@@ -116,14 +116,39 @@ uv run python scripts/generate_animation.py \
   --edge-feather 2.0
 ```
 
-This generates `frame_000.png` through `frame_015.png` in the output directory. Each frame is generated with the previous frame attached as a reference image, so the character stays visually consistent.
+**Expected output** (each frame takes ~10–30 seconds):
+```
+--- Frame 1/16 ---
+Prompt: Character: 蓬鬆白色馬爾濟斯. Visual style: ... Expression/Pose: Frame 1: ...
+Reference images: (none)
+Saved: anims/maltese_wave/frames/frame_000.png (1024x1024)
 
-Output (printed to stdout):
-```json
-{"frames": ["anims/maltese_wave/frames/frame_000.png", ..., "anims/maltese_wave/frames/frame_015.png"]}
+--- Frame 2/16 ---
+Prompt: Character: 蓬鬆白色馬爾濟斯. Visual style: ... Expression/Pose: Frame 2: ...
+Reference images: anims/maltese_wave/frames/frame_000.png
+Saved: anims/maltese_wave/frames/frame_001.png (1024x1024)
+
+--- Frame 3/16 ---
+...
+
+--- Frame 16/16 ---
+Prompt: Character: 蓬鬆白色馬爾濟斯. Visual style: ... Expression/Pose: Frame 16: ...
+Reference images: anims/maltese_wave/frames/frame_014.png
+Saved: anims/maltese_wave/frames/frame_015.png (1024x1024)
+
+{
+  "frames": [
+    "anims/maltese_wave/frames/frame_000.png",
+    "anims/maltese_wave/frames/frame_001.png",
+    ...
+    "anims/maltese_wave/frames/frame_015.png"
+  ]
+}
 ```
 
-> **Background color tip**: Gemini doesn't always render the exact chroma key color specified (e.g., requesting `#00FF00` may produce a muted olive green `#88B569`). This is why the next step uses **auto background detection** rather than `--chroma-key`.
+This generates `frame_000.png` through `frame_015.png`. Each frame uses the previous frame as a visual reference — this "reference chaining" keeps the character's appearance consistent.
+
+> **Background color tip**: Gemini doesn't always render the exact chroma key color specified (e.g., requesting `#00FF00` may produce a muted olive green `#88B569`). This is why the alignment step uses **auto background detection** rather than `--chroma-key`.
 
 ---
 
@@ -153,7 +178,7 @@ echo '{
 
 ---
 
-## Step 5: Analyze Frames for Alignment Anchors
+## Step 5: Analyze Frames for Alignment Anchors (Optional)
 
 For sitting/standing animations, the most stable alignment approach is a **Claude-analyzed anchor file** — a JSON with per-frame pixel coordinates for the character's visual center and feet position.
 
@@ -185,6 +210,8 @@ Open each frame image and estimate these four values (all in the **original 1024
 ```
 
 > **Why bother?** For a waving animation, the character's body drifts slightly as the arm rises. Bbox centering tracks the arm and makes the body appear to jitter. The anchor file pins the body's visual center, ignoring the raised arm — producing a much smoother result.
+>
+> **You can skip this step** and use `--pixel-align` or default bbox centering instead. See the Alignment Method Reference at the bottom of this guide.
 
 ---
 
@@ -198,14 +225,55 @@ uv run python scripts/make_apng.py align \
   --edge-feather 2.0
 ```
 
-- `--anchor-file` — use the pre-computed coordinates instead of bbox/API
-- `--edge-feather 2.0` — apply a 2px Gaussian blur to the alpha edge for soft, anti-aliased transparency (removes the hard pixelated edge from background removal)
-
-The aligned frames are placed on a uniform canvas (default 1024×1024). You'll see per-frame output like:
+**Expected output:**
 ```
-frame_000.png → paste at (40, 60) [anchor-file]
-frame_001.png → paste at (41, 61) [anchor-file]
-...
+Loaded anchor file: anims/maltese_wave/anchors.json (16 entries)
+Canvas: 940x972, center: (470, 486)
+Max content size: 855x884
+Anchor: center, edge-feather: 2.0, align-mode: anchor-file
+  frame_000 [anchor-file]: bbox=(79,68,934,952) → paste=(37,35)
+  frame_001 [anchor-file]: bbox=(108,98,905,936) → paste=(67,66)
+  frame_002 [anchor-file]: bbox=(126,92,922,934) → paste=(86,60)
+  frame_003 [anchor-file]: bbox=(130,91,924,934) → paste=(92,61)
+  frame_004 [anchor-file]: bbox=(127,91,920,933) → paste=(91,62)
+  frame_005 [anchor-file]: bbox=(125,89,910,938) → paste=(93,61)
+  frame_006 [anchor-file]: bbox=(141,94,896,934) → paste=(113,66)
+  frame_007 [anchor-file]: bbox=(141,94,897,934) → paste=(119,69)
+  frame_008 [anchor-file]: bbox=(161,84,911,931) → paste=(139,59)
+  frame_009 [anchor-file]: bbox=(147,80,906,946) → paste=(123,56)
+  frame_010 [anchor-file]: bbox=(134,78,887,943) → paste=(107,52)
+  frame_011 [anchor-file]: bbox=(144,90,888,951) → paste=(114,64)
+  frame_012 [anchor-file]: bbox=(165,90,898,950) → paste=(132,64)
+  frame_013 [anchor-file]: bbox=(156,88,887,940) → paste=(116,64)
+  frame_014 [anchor-file]: bbox=(156,92,886,947) → paste=(115,69)
+  frame_015 [anchor-file]: bbox=(156,89,886,944) → paste=(114,65)
+Aligned 16 frames to anims/maltese_wave/aligned
+```
+
+- `--anchor-file` — use the pre-computed coordinates instead of bbox
+- `--edge-feather 2.0` — apply a 2px Gaussian blur to the alpha edge for soft, anti-aliased transparency (removes the hard pixelated edge from background removal)
+- `bbox=(x1,y1,x2,y2)` — the character's bounding box in the original frame
+- `paste=(x,y)` — where the cropped character is placed on the output canvas
+
+**Alternative without anchor file** (simpler, slightly less stable):
+```bash
+# Pixel-based alignment (alpha-weighted centroid, no setup needed)
+uv run python scripts/make_apng.py align \
+  anims/maltese_wave/frames/ \
+  -o anims/maltese_wave/aligned/ \
+  --pixel-align --edge-feather 2.0
+```
+
+**Expected output (pixel mode):**
+```
+Canvas: 940x972, center: (470, 486)
+Max content size: 855x884
+Anchor: center, edge-feather: 2.0, align-mode: pixel
+  frame_000 [pixel]: bbox=(79,68,934,952) → paste=(30,34)
+  frame_001 [pixel]: bbox=(108,98,905,936) → paste=(67,64)
+  ...
+  frame_015 [pixel]: bbox=(156,89,886,944) → paste=(107,56)
+Aligned 16 frames to anims/maltese_wave/aligned
 ```
 
 ---
@@ -228,7 +296,16 @@ for f in sorted(src.glob('*.png')):
 "
 ```
 
-The Maltese dog frames come out at **254×270 px** after thumbnail scaling (width is the limiting dimension at 270px height).
+**Expected output:**
+```
+frame_000.png: (254, 270)
+frame_001.png: (254, 270)
+frame_002.png: (254, 270)
+...
+frame_015.png: (254, 270)
+```
+
+All frames are **254×270 px** — width is the constraining dimension at the 270px height.
 
 ---
 
@@ -243,11 +320,7 @@ uv run python scripts/make_apng.py combine \
   --quantize
 ```
 
-- `--fps 16` — 16 frames at 16fps = ~1 second loop. Feels natural for a wave.
-- `--timing ease-in-out` — slow at the bottom of the wave (rest pose), fast through the mid-arc. Makes the motion feel more organic than uniform timing.
-- `--quantize` — reduce to 256 colors (APNG palette compression). Often cuts file size by 30–50%.
-
-Expected output:
+**Expected output:**
 ```
 Quantizing frames to 256 colors...
 [LOOP OK] First↔last frame difference score: 18.4/100
@@ -259,7 +332,22 @@ LINE animated validation [PASS]:
   [OK] 558.5KB (max 1024KB)
 ```
 
-The `[LOOP OK]` score (18.4/100) confirms frame 16 and frame 1 are visually similar — the loop will play smoothly.
+- `--fps 16` — 16 frames at 16fps = ~1 second loop. Feels natural for a wave.
+- `--timing ease-in-out` — slow at the bottom of the wave (rest pose), fast through the mid-arc. Makes the motion feel more organic than uniform timing.
+- `--quantize` — reduce to 256 colors (APNG palette compression). Often cuts file size by 30–50%.
+- `[LOOP OK]` score (18.4/100) confirms frame 16 and frame 1 are visually similar — the loop will play smoothly. A score ≥ 20 triggers `[LOOP WARN]`.
+- All four LINE constraints pass: dimensions, frame count, duration, and file size.
+
+**If LINE validation fails**, the tool will print `[FAIL]` lines:
+```
+LINE animated validation [FAIL]:
+  [OK] 254x270 px (max 320x270)
+  [OK] 16 frames (must be 5–20)
+  [OK] 992ms total (max 4000ms)
+  [FAIL] 1234.5KB (max 1024KB)    ← file too large
+```
+
+See the File Size Troubleshooting section below.
 
 ---
 
@@ -272,16 +360,50 @@ The `[LOOP OK]` score (18.4/100) confirms frame 16 and frame 1 are visually simi
 
 ---
 
+## Complete Pipeline Summary
+
+```bash
+# 1. Generate frames (reference chaining, ~5 min for 16 frames)
+uv run python scripts/generate_animation.py \
+  -s anims/maltese_wave/spec.json \
+  -o anims/maltese_wave/frames/ \
+  --edge-feather 2.0
+
+# 2. Align (anchor-file or --pixel-align)
+uv run python scripts/make_apng.py align \
+  anims/maltese_wave/frames/ \
+  -o anims/maltese_wave/aligned/ \
+  --anchor-file anims/maltese_wave/anchors.json \
+  --edge-feather 2.0
+
+# 3. Resize to LINE dimensions
+uv run python -c "
+from PIL import Image; from pathlib import Path
+src, dst = Path('anims/maltese_wave/aligned'), Path('anims/maltese_wave/sm')
+dst.mkdir(exist_ok=True)
+for f in sorted(src.glob('*.png')):
+    img = Image.open(f); img.thumbnail((320, 270), Image.LANCZOS)
+    img.save(str(dst / f.name), 'PNG')
+"
+
+# 4. Combine into APNG
+uv run python scripts/make_apng.py combine \
+  anims/maltese_wave/sm/ \
+  -o anims/maltese_wave/maltese_wave.apng \
+  --fps 16 --timing ease-in-out --quantize
+```
+
+---
+
 ## Alignment Method Reference
 
 Choose the alignment mode that fits your animation type:
 
-| Mode | Flag | When to use |
-|------|------|-------------|
-| Anchor file | `--anchor-file anchors.json` | Sit/stand animations — most stable, no API calls after setup |
-| Pixel align | `--pixel-align` | Quick jobs — alpha-weighted centroid, deterministic |
-| Gemini vision | `--vision-align` | Only with `--anchor bottom` (e.g., walk cycles); unreliable for center |
-| Bbox (default) | _(no flag)_ | Simple animations with no body drift |
+| Mode | Flag | Stability | When to use |
+|------|------|-----------|-------------|
+| Anchor file | `--anchor-file anchors.json` | Best | Sit/stand animations — pre-computed coordinates, most stable |
+| Pixel align | `--pixel-align` | Good | Quick jobs — alpha-weighted centroid, no setup needed |
+| Bbox (default) | _(no flag)_ | OK | Simple animations with no body drift |
 
 For **walk/jump** animations where feet should stay grounded:
 ```bash
@@ -321,3 +443,24 @@ uv run python scripts/make_apng.py combine anims/<name>/sm/ -o anims/<name>/<nam
 # Step 3: manually reduce frame count or FPS
 uv run python scripts/make_apng.py combine anims/<name>/sm/ -o anims/<name>/<name>.apng --fps 12 --quantize
 ```
+
+---
+
+## File Organization
+
+```
+chars/
+  maltese_dog.json             ← character features (tracked)
+anims/
+  maltese_wave/
+    spec.json                  ← animation spec (tracked)
+    anchors.json               ← anchor coordinates (tracked)
+    frames/                    ← raw generated frames (gitignored)
+    aligned/                   ← aligned full-res frames (gitignored)
+    sm/                        ← resized for LINE (gitignored)
+    maltese_wave.apng          ← final output (gitignored)
+refs/
+  maltese_dog.jpg              ← reference photos (gitignored)
+```
+
+Only `spec.json`, `anchors.json`, and `chars/*.json` are tracked in git. Everything else is regenerable.

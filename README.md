@@ -89,14 +89,6 @@ echo '{
 | `--remove-bg` | Remove chroma key background after generation |
 | `--line-resize` | Resize to fit within LINE sticker limits (370×320) |
 
-### Detect anchor points in a frame (Gemini vision)
-
-```bash
-uv run python scripts/analyze_frame.py frame_000.png
-```
-
-Outputs a JSON with `feet_y_frac`, `head_y_frac`, `center_x_frac`, `center_y_frac`, `bbox_px`. Useful for inspecting individual frames; for batch alignment prefer `--anchor-file` (Claude-analyzed) or `--pixel-align`.
-
 ### Cut a sprite sheet into frames
 
 ```bash
@@ -121,14 +113,11 @@ uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --anchor-file a
 # Pixel-based alignment (alpha-weighted centroid, no API)
 uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --pixel-align
 
-# Gemini vision alignment (use with --anchor bottom only; unreliable for center)
-uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --vision-align --anchor bottom
-
 # Bottom anchor for walk/jump animations
 uv run python scripts/make_apng.py align ./frames/ -o ./aligned/ --anchor bottom
 ```
 
-**Alignment mode priority** (when multiple flags are given): `--anchor-file` > `--pixel-align` > `--vision-align` > bbox (default)
+**Alignment mode priority** (when multiple flags are given): `--anchor-file` > `--pixel-align` > bbox (default)
 
 ### Combine frames into APNG
 

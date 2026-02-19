@@ -93,16 +93,35 @@ The assistant runs `generate_animation.py` with reference chaining — each fram
 
 > **Assistant:**
 > Generating 16 frames with flash model (reference chaining enabled)...
-> ✓ frame_000.png
-> ✓ frame_001.png
+>
+> ```
+> --- Frame 1/16 ---
+> Reference images: (none)
+> Saved: anims/maltese_wave/frames/frame_000.png (1024x1024)
+>
+> --- Frame 2/16 ---
+> Reference images: anims/maltese_wave/frames/frame_000.png
+> Saved: anims/maltese_wave/frames/frame_001.png (1024x1024)
+>
 > ...
-> ✓ frame_015.png
-> Done. Let me check the frames for any issues.
+>
+> --- Frame 16/16 ---
+> Reference images: anims/maltese_wave/frames/frame_014.png
+> Saved: anims/maltese_wave/frames/frame_015.png (1024x1024)
+> ```
+>
+> All 16 frames generated. Let me check them for any issues.
 
 The assistant will view each frame and flag any problems it spots:
 
 > **Assistant:**
 > Frame 4 has an extra paw visible — the model drew 5 limbs. I'll regenerate it using frames 3 and 5 as references.
+>
+> ```
+> Saved: anims/maltese_wave/frames/frame_004.png (1024x1024)
+> ```
+>
+> Replaced frame_004. All 16 frames look good now.
 
 You don't need to do anything here. The assistant handles the regeneration automatically.
 
@@ -115,7 +134,7 @@ For sit/stand animations, the assistant analyzes each frame to find the characte
 > **Assistant:**
 > I'm going to look at each frame and note the body center and feet position so the alignment step doesn't track the waving arm. This keeps the body stable across all 16 frames.
 
-The assistant views each frame and writes `maltese_wave_anchors.json`:
+The assistant views each frame and writes `anims/maltese_wave/anchors.json`:
 
 ```json
 {
@@ -127,54 +146,54 @@ The assistant views each frame and writes `maltese_wave_anchors.json`:
 }
 ```
 
-> You can also skip this step and use `--pixel-align` (no API, deterministic) or leave it at default bbox centering. Anchor file gives the tightest result for sitting animations.
+> You can also skip this step and tell the assistant: "Just use pixel alignment" or "Default alignment is fine".
 
 ---
 
 ### Step 6: Align, Resize, and Combine
 
-The assistant runs the pipeline in sequence:
+The assistant runs the full pipeline in sequence:
 
 **Align** — places each character on a uniform canvas using the anchor file:
 
-```bash
-uv run python scripts/make_apng.py align \
-  anims/maltese_wave/frames/ -o anims/maltese_wave/aligned/ \
-  --anchor-file anims/maltese_wave/anchors.json --edge-feather 2.0
-```
+> **Assistant:**
+> Aligning frames...
+> ```
+> Loaded anchor file: anims/maltese_wave/anchors.json (16 entries)
+> Canvas: 940x972, center: (470, 486)
+> Anchor: center, edge-feather: 2.0, align-mode: anchor-file
+>   frame_000 [anchor-file]: bbox=(79,68,934,952) → paste=(37,35)
+>   frame_001 [anchor-file]: bbox=(108,98,905,936) → paste=(67,66)
+>   ...
+>   frame_015 [anchor-file]: bbox=(156,89,886,944) → paste=(114,65)
+> Aligned 16 frames to anims/maltese_wave/aligned
+> ```
 
 **Resize** — scales to fit LINE's 320×270 limit:
 
-```bash
-uv run python -c "
-from PIL import Image; from pathlib import Path
-src, dst = Path('anims/maltese_wave/aligned'), Path('anims/maltese_wave/sm')
-dst.mkdir(exist_ok=True)
-for f in sorted(src.glob('*.png')):
-    img = Image.open(f); img.thumbnail((320, 270), Image.LANCZOS)
-    img.save(str(dst / f.name), 'PNG')
-"
-```
+> **Assistant:**
+> Resizing to LINE dimensions...
+> ```
+> frame_000.png: (254, 270)
+> frame_001.png: (254, 270)
+> ...
+> frame_015.png: (254, 270)
+> ```
 
 **Combine** — assembles frames into the final animated PNG:
 
-```bash
-uv run python scripts/make_apng.py combine \
-  anims/maltese_wave/sm/ -o anims/maltese_wave/maltese_wave.apng \
-  --fps 16 --timing ease-in-out --quantize
-```
-
 > **Assistant:**
 > ```
+> Quantizing frames to 256 colors...
 > [LOOP OK] First↔last frame difference score: 18.4/100
-> Created: anims/maltese_wave/maltese_wave.apng (16 frames, 992ms, ease-in-out)
-> LINE validation [PASS]:
->   [OK] 254×270 px
->   [OK] 16 frames
->   [OK] 992ms total
->   [OK] 558.5 KB
+> Created APNG: anims/maltese_wave/maltese_wave.apng (16 frames, 992ms total, timing=ease-in-out)
+> LINE animated validation [PASS]:
+>   [OK] 254x270 px (max 320x270)
+>   [OK] 16 frames (must be 5–20)
+>   [OK] 992ms total (max 4000ms)
+>   [OK] 558.5KB (max 1024KB)
 > ```
-> Your sticker is ready at `anims/maltese_wave/maltese_wave.apng`. Want to adjust anything?
+> Your sticker is ready at `anims/maltese_wave/maltese_wave.apng`. All LINE constraints pass. Want to adjust anything?
 
 ---
 
@@ -184,11 +203,12 @@ Common follow-up requests and what the assistant will do:
 
 | You say | Assistant action |
 |---------|-----------------|
-| "The wave looks too fast at the top" | Re-combine with `--timing ease-in-out` or custom `--timing "80,60,40,40,60,80,..."` |
-| "Frame 8 looks wrong" | Regenerate that frame with neighbors as references |
+| "The wave looks too fast at the top" | Re-combine with custom timing: `--timing "80,60,40,40,60,80,..."` |
+| "Frame 8 looks wrong" | Regenerate that frame using frames 7 and 9 as references |
 | "File is over 1MB" | Re-combine with `--quantize --auto-resize` |
 | "Make it slower" | Re-combine with `--fps 12` or `--duration 1500` |
-| "Add a second sticker where she sits and blinks" | Start a new spec with 6–8 blink frames |
+| "The loop has a visible jump" | Check `[LOOP WARN]` score; adjust last frame's pose to match frame 1 |
+| "Add a second sticker where she sits and blinks" | Create a new `anims/maltese_blink/` project with 6–8 blink frames |
 
 ---
 
@@ -216,12 +236,12 @@ Common follow-up requests and what the assistant will do:
 
 ## Alignment Mode Cheat Sheet
 
-| Situation | Ask for |
-|-----------|---------|
-| Sitting/standing animation | "Use anchor file alignment" (assistant analyzes frames) |
-| Quick draft, no API calls | "Use pixel alignment" |
-| Walk or jump cycle | "Use bottom anchor" |
-| Simple loop, minimal body movement | Leave at default (bbox centering) |
+| Situation | Ask for | What it does |
+|-----------|---------|-------------|
+| Sitting/standing animation | "Use anchor file alignment" | Assistant analyzes frames visually, writes anchor JSON |
+| Quick draft, no setup | "Use pixel alignment" | Alpha-weighted centroid, deterministic |
+| Walk or jump cycle | "Use bottom anchor" | Pins feet at fixed height |
+| Simple loop, minimal body movement | Leave at default | Bbox centering |
 
 ---
 
@@ -232,6 +252,7 @@ Common follow-up requests and what the assistant will do:
 | Dimensions | ≤ 320×270 px |
 | Frame count | 5–20 frames |
 | Total duration | ≤ 4 seconds |
+| FPS | 10–20 fps |
 | File size | < 1 MB |
 
-The assistant checks all four after every combine and tells you if anything fails.
+The assistant checks all constraints after every combine and prints `[PASS]` or `[FAIL]` with details.

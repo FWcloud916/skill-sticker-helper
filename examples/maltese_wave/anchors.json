@@ -1,0 +1,18 @@
+{
+  "frame_000.png": {"center_x": 512, "center_y": 519, "feet_y": 930, "head_y": 100},
+  "frame_001.png": {"center_x": 511, "center_y": 518, "feet_y": 926, "head_y": 100},
+  "frame_002.png": {"center_x": 510, "center_y": 518, "feet_y": 924, "head_y": 100},
+  "frame_003.png": {"center_x": 508, "center_y": 516, "feet_y": 926, "head_y": 100},
+  "frame_004.png": {"center_x": 506, "center_y": 515, "feet_y": 928, "head_y": 100},
+  "frame_005.png": {"center_x": 502, "center_y": 514, "feet_y": 926, "head_y": 100},
+  "frame_006.png": {"center_x": 498, "center_y": 514, "feet_y": 933, "head_y": 117},
+  "frame_007.png": {"center_x": 492, "center_y": 511, "feet_y": 926, "head_y": 93},
+  "frame_008.png": {"center_x": 492, "center_y": 511, "feet_y": 927, "head_y": 93},
+  "frame_009.png": {"center_x": 494, "center_y": 510, "feet_y": 927, "head_y": 92},
+  "frame_010.png": {"center_x": 497, "center_y": 512, "feet_y": 928, "head_y": 90},
+  "frame_011.png": {"center_x": 500, "center_y": 512, "feet_y": 929, "head_y": 87},
+  "frame_012.png": {"center_x": 503, "center_y": 512, "feet_y": 931, "head_y": 85},
+  "frame_013.png": {"center_x": 510, "center_y": 510, "feet_y": 933, "head_y": 87},
+  "frame_014.png": {"center_x": 511, "center_y": 509, "feet_y": 933, "head_y": 87},
+  "frame_015.png": {"center_x": 512, "center_y": 510, "feet_y": 935, "head_y": 86}
+}

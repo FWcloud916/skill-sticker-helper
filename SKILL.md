@@ -88,7 +88,7 @@ Once you have character features (from analysis or conversation), construct a **
 | `count` | Number of variations to generate | 1 |
 
 The `character_features` field can be:
-- A file path string (e.g., `"features.json"`) — the script will load the detailed features from this file
+- A file path string (e.g., `"chars/maltese_dog.json"`) — the script will load the detailed features from this file
 - An inline object with the full character features
 
 Ask the user to confirm or modify the spec before generating.
@@ -286,15 +286,7 @@ Uses alpha-weighted centroid and row-density scan — no API calls needed.
 uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/ --pixel-align --edge-feather 2.0
 ```
 
-**Option 3 — Gemini vision alignment**
-
-Calls `gemini-2.5-flash`. **Not recommended for `--anchor center`** due to inconsistent results. Only use with `--anchor bottom` for walk/jump animations.
-
-```bash
-uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/ --vision-align --anchor bottom
-```
-
-**Option 4 — Default bbox centering**
+**Option 3 — Default bbox centering**
 
 ```bash
 uv run python scripts/make_apng.py align anims/<name>/frames/ -o anims/<name>/aligned/
@@ -362,7 +354,7 @@ Show the result to the user. Offer to:
 
 ### Reference
 
-- LINE animated sticker specifications are documented in `references/line_sticker_spec.md`
+- LINE animated sticker specs: 320×270px, 5–20 frames, ≤4s, <1MB, 10-20 fps
 
 ---
 
@@ -395,7 +387,7 @@ Field names can be in any language. Here's an English example:
 }
 ```
 
-See `features.json` for a full example using Chinese field names.
+See `examples/maltese_wave/maltese_dog.json` for a full example using Chinese field names.
 
 ## Reference
 

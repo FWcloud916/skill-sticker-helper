@@ -12,12 +12,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from image_utils import remove_chroma_key as _shared_remove_chroma_key, find_anchor_points as _find_anchor_points
 
-try:
-    from analyze_frame import analyze_frame as _analyze_frame
-    _VISION_ALIGN_AVAILABLE = True
-except ImportError:
-    _VISION_ALIGN_AVAILABLE = False
-
 from PIL import Image, ImageChops, ImageFilter
 
 
@@ -340,7 +334,6 @@ def align_frames(
     chroma_key: str | None = None,
     anchor: str = "center",
     feather_radius: float = 0.0,
-    vision_align: bool = False,
     pixel_align: bool = False,
     anchor_file: str | None = None,
 ):
@@ -363,20 +356,15 @@ def align_frames(
                 - "bottom": feet anchored at 90% of canvas height (good for walk/jump)
                 - "top": head anchored at 10% of canvas height
         feather_radius: Gaussian blur radius for soft alpha edges. 0 = hard edges.
-        vision_align: If True, use Gemini vision to detect semantic anchor points (feet,
-                      head, visual center) per frame instead of geometric bbox center.
-                      Requires GEMINI_API_KEY. Falls back to bbox center per frame if the
-                      vision call fails. Each frame makes one Gemini API call.
         pixel_align: If True, use alpha-channel pixel analysis (no API calls) to find
                      anchor points: alpha-weighted centroid for center and row-density
-                     scan for feet/head. More stable than vision_align for center anchor.
-                     Takes priority over vision_align if both are True.
+                     scan for feet/head.
         anchor_file: Path to a JSON file containing pre-computed anchor points keyed by
                      frame filename. Format:
                        {"frame_000.png": {"center_x": 510, "center_y": 520,
                                           "feet_y": 935, "head_y": 80}, ...}
                      All coordinates are in original frame pixel space.
-                     Takes priority over pixel_align and vision_align.
+                     Takes priority over pixel_align.
                      Frames missing from the file fall back to bbox alignment.
     """
     frames_path = Path(frames_dir)
@@ -440,18 +428,12 @@ def align_frames(
         align_mode = "anchor-file"
     elif pixel_align:
         align_mode = "pixel"
-    elif vision_align:
-        align_mode = "vision"
     else:
         align_mode = "bbox"
 
     print(f"Canvas: {canvas_w}x{canvas_h}, center: ({canvas_cx}, {canvas_cy})", file=sys.stderr)
     print(f"Max content size: {max_content_w}x{max_content_h}", file=sys.stderr)
     print(f"Anchor: {anchor}, edge-feather: {feather_radius}, align-mode: {align_mode}", file=sys.stderr)
-
-    if vision_align and not _VISION_ALIGN_AVAILABLE:
-        print("Warning: analyze_frame.py not found — vision-align disabled, using bbox fallback.", file=sys.stderr)
-        vision_align = False
 
     saved = []
     for i, (img, bbox) in enumerate(zip(frames, bboxes)):
@@ -501,33 +483,6 @@ def align_frames(
                     used_mode = "pixel"
                 else:
                     print(f"  frame_{i:03d}: pixel analysis returned None, falling back to bbox", file=sys.stderr)
-
-            elif vision_align:
-                anchors = _analyze_frame(img)
-                if anchors is not None:
-                    img_w, img_h = img.size
-                    cx_in = anchors["center_x_frac"] * img_w - left
-                    cy_in = anchors["center_y_frac"] * img_h - upper
-                    fy_in = anchors["feet_y_frac"]   * img_h - upper
-                    hy_in = anchors["head_y_frac"]   * img_h - upper
-
-                    if not (0 <= fy_in <= content_h):
-                        print(
-                            f"  frame_{i:03d}: WARN feet_y_in_content={fy_in:.1f} "
-                            f"outside content_h={content_h} — alignment may be off",
-                            file=sys.stderr,
-                        )
-
-                    paste_x = canvas_cx - int(cx_in)
-                    if anchor == "bottom":
-                        paste_y = int(canvas_h * 0.9) - int(fy_in)
-                    elif anchor == "top":
-                        paste_y = int(canvas_h * 0.1) - int(hy_in)
-                    else:
-                        paste_y = canvas_cy - int(cy_in)
-                    used_mode = "vision"
-                else:
-                    print(f"  frame_{i:03d}: vision failed, falling back to bbox", file=sys.stderr)
 
             if used_mode == "bbox":
                 content_cx = content_w // 2
@@ -894,7 +849,7 @@ def main():
         help=(
             "Path to a JSON file of pre-computed anchor points keyed by frame filename. "
             "Format: {\"frame_000.png\": {\"center_x\": N, \"center_y\": N, \"feet_y\": N, \"head_y\": N}, ...}. "
-            "Takes priority over --pixel-align and --vision-align. "
+            "Takes priority over --pixel-align. "
             "Frames not in the file fall back to bbox alignment."
         ),
     )
@@ -905,23 +860,9 @@ def main():
         dest="pixel_align",
         help=(
             "Use alpha-channel pixel analysis (no API calls) to find anchor points: "
-            "alpha-weighted centroid for center_x/center_y, row-density scan for feet/head. "
-            "More stable than --vision-align. Takes priority over --vision-align if both are set."
+            "alpha-weighted centroid for center_x/center_y, row-density scan for feet/head."
         ),
     )
-    align_parser.add_argument(
-        "--vision-align",
-        action="store_true",
-        default=False,
-        dest="vision_align",
-        help=(
-            "Use Gemini vision to detect semantic anchor points (feet, head) per frame. "
-            "Most useful with --anchor bottom (finds actual foot contact point vs bbox bottom edge). "
-            "Not recommended for --anchor center — bbox is more stable for that case. "
-            "Requires GEMINI_API_KEY. Makes one Gemini API call per frame. Falls back to bbox on failure."
-        ),
-    )
-
     # --- combine subcommand ---
     combine_parser = subparsers.add_parser("combine", help="Combine frame PNGs into an APNG.")
     combine_parser.add_argument("frames_dir", help="Directory of frame PNGs (sorted alphabetically).")
@@ -973,7 +914,6 @@ def main():
         align_frames(
             args.frames_dir, args.output, args.width, args.height,
             args.chroma_key, args.anchor, args.edge_feather,
-            vision_align=args.vision_align,
             pixel_align=args.pixel_align,
             anchor_file=args.anchor_file,
         )
